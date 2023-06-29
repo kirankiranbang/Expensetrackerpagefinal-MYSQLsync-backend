@@ -48,6 +48,9 @@
       const expenses = JSON.parse(localStorage.getItem('expenses')) || [];
       renderExpenses(expenses);
 
+      //windows.addEventLister(DomContentLoaded ) is rreuired for fetch data maeans getall data for axois.get()
+
+
       async function fetchData() {
         try {
           const response = await axios.get('http://localhost:4000/expense/addexpense-data');
@@ -201,3 +204,4 @@
   </script>
 </body>
 </html>
+//
