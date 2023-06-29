@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Expense Tracker</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    .card {
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+
+    .card-actions {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Expense Tracker</h1>
+  <div class="container">
+    <form id="expense-form">
+      <div class="form-group">
+        <label for="expenseamount">Amount:</label>
+        <input type="number" class="form-control" id="expenseamount" name="expenseamount" required>
+      </div>
+
+      <div class="form-group">
+        <label for="description">Description:</label>
+        <input type="text" class="form-control" id="description" name="description" required>
+      </div>
+
+      <div class="form-group">
+        <label for="category">Category:</label>
+        <input type="text" class="form-control" id="category" name="category" required>
+      </div>
+
+      <button type="submit" class="btn btn-primary">Add Expense</button>
+    </form>
+
+    <div id="output"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      // Fetch initial data from local storage
+      const expenses = JSON.parse(localStorage.getItem('expenses')) || [];
+      renderExpenses(expenses);
+
+      async function fetchData() {
+        try {
+          const response = await axios.get('http://localhost:4000/expense/addexpense-data');
+          const expenses = response.data;
+          localStorage.setItem('expenses', JSON.stringify(expenses));
+          renderExpenses(expenses);
+        } catch (error) {
+          console.error('Error fetching expenses:', error);
+        }
+      }
+
+      function renderExpenses(expenses) {
+        const outputElement = document.getElementById('output');
+        outputElement.innerHTML = '';
+
+        expenses.forEach(expense => {
+          const card = createExpenseCard(expense);
+          outputElement.innerHTML += card;
+        });
+
+        // Attach event listeners to the delete buttons
+        const deleteButtons = document.getElementsByClassName('delete-button');
+        Array.from(deleteButtons).forEach((button, index) => {
+          button.addEventListener('click', () => deleteData(expenses[index].id));
+        });
+
+        // Attach event listeners to the edit buttons
+        const editButtons = document.getElementsByClassName('edit-button');
+        Array.from(editButtons).forEach((button, index) => {
+          button.addEventListener('click', () => editData(expenses[index].id));
+        });
+      }
+
+      function createExpenseCard(entry) {
+        return `
+          <div class="card" id="card-${entry.id}">
+            <div class="card-body">
+              <h3 class="card-title">Amount: $${entry.expenseamount}</h3>
+              <p class="card-text">Description: ${entry.description}</p>
+              <p class="card-text">Category: ${entry.category}</p>
+            </div>
+            <div class="card-actions">
+              <button class="btn btn-primary edit-button">Edit</button>
+              <button class="btn btn-danger delete-button">Delete</button>
+            </div>
+          </div>
+          <br>
+        `;
+      }
+
+      document.getElementById('expense-form').addEventListener('submit', addExpense);
+
+      async function addExpense(event) {
+        event.preventDefault(); // Prevent form submission
+
+        try {
+          const expenseamount = document.getElementById('expenseamount').value;
+          const description = document.getElementById('description').value;
+          const category = document.getElementById('category').value;
+
+          const newExpense = {
+            expenseamount: parseFloat(expenseamount),
+            description: description,
+            category: category
+          };
+
+          const response = await axios.post('http://localhost:4000/expense/addexpense', newExpense);
+          const responseData = response.data;
+
+          // Update local storage
+          const expenses = JSON.parse(localStorage.getItem('expenses')) || [];
+          expenses.push(responseData);
+          localStorage.setItem('expenses', JSON.stringify(expenses));
+
+          // Clear form fields after successful submission
+          document.getElementById('expenseamount').value = '';
+          document.getElementById('description').value = '';
+          document.getElementById('category').value = '';
+
+          location.reload();// this is reshes page automatically//other data comes as undefined
+          // Render the new expense card
+          const card = createExpenseCard(responseData);
+          document.getElementById('output').innerHTML += card;
+
+          // Attach event listener to the new delete button
+          const deleteButton = document.getElementById(`card-${responseData.id}`).getElementsByClassName('delete-button')[0];
+          deleteButton.addEventListener('click', () => deleteData(responseData.id));
+
+          // Attach event listener to the new edit button
+          const editButton = document.getElementById(`card-${responseData.id}`).getElementsByClassName('edit-button')[0];
+          editButton.addEventListener('click', () => editData(responseData.id));
+        } catch (error) {
+          console.error('Error adding expense:', error);
+        }
+      }
+
+      async function deleteData(id) {
+        try {
+          await axios.delete(`http://localhost:4000/expense/deleteexpense/${id}`);
+
+          // Update local storage
+          const expenses = JSON.parse(localStorage.getItem('expenses')) || [];
+          const index = expenses.findIndex(expense => expense.id === id);
+          if (index !== -1) {
+            expenses.splice(index, 1);
+            localStorage.setItem('expenses', JSON.stringify(expenses));
+          }
+
+          // Remove the card element from the page
+          const cardId = `card-${id}`;
+          const cardElement = document.getElementById(cardId);
+          if (cardElement) {
+            cardElement.remove();
+          }
+        } catch (error) {
+          console.error('Error deleting data:', error);
+        }
+      }
+
+      async function editData(id) {
+        try {
+          const expenseamount = prompt('Enter the new amount:');
+          const description = prompt('Enter the new description:');
+          const category = prompt('Enter the new category:');
+
+          const updatedExpense = {
+            expenseamount: parseFloat(expenseamount),
+            description: description,
+            category: category
+          };
+
+          await axios.put(`http://localhost:4000/expense/editexpense/${id}`, updatedExpense);
+
+          // Update local storage
+          const expenses = JSON.parse(localStorage.getItem('expenses')) || [];
+          const index = expenses.findIndex(expense => expense.id === id);
+          if (index !== -1) {
+            expenses[index] = { id, ...updatedExpense };
+            localStorage.setItem('expenses', JSON.stringify(expenses));
+          }
+
+          // Fetch and render the updated expense
+          fetchData();
+        } catch (error) {
+          console.error('Error updating data:', error);
+        }
+      }
+
+      fetchData();
+    });
+  </script>
+</body>
+</html>
